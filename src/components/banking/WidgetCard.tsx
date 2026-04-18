@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Contact,
   Moon,
+  Leaf,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -22,7 +23,9 @@ import { cn } from "@/lib/utils";
 import type { WidgetId } from "@/lib/banking/types";
 import { WIDGET_CATALOG } from "@/lib/banking/widgets";
 import { loadState } from "@/lib/banking/storage";
+import { computeCO2 } from "@/lib/banking/co2";
 import { useEffect, useState } from "react";
+import { findTheme, type ThemeId, OVERLAY_TO_HOLIDAY_THEME, type HolidayOverlayId } from "@/lib/banking/themes";
 
 const ICONS: Record<WidgetId, LucideIcon> = {
   subscriptionManager: Repeat,
@@ -41,6 +44,7 @@ const ICONS: Record<WidgetId, LucideIcon> = {
   insuranceCoverage: ShieldCheck,
   commonContacts: Contact,
   lunarPoints: Moon,
+  co2Tracker: Leaf,
 };
 
 function LunarWidget() {
@@ -59,9 +63,38 @@ function LunarWidget() {
   return (
     <div>
       <div className="mb-1 text-sm text-muted-foreground">Your balance</div>
-      <div className="text-2xl font-bold">🌙 {points.toLocaleString()} LP</div>
+      <div className="text-2xl font-bold">⭐ {points.toLocaleString()} SP</div>
       <div className="mt-2 text-xs text-muted-foreground">{steps.toLocaleString()} steps tracked</div>
       <div className="mt-3 text-xs text-primary">Tap to earn more →</div>
+    </div>
+  );
+}
+
+function CO2Widget() {
+  const result = computeCO2();
+  const pct = Math.min(100, Math.round((result.totalKg / result.baselineKg) * 100));
+  const top = result.byCategory.slice(0, 3);
+  return (
+    <div>
+      <div className="mb-1 text-sm text-muted-foreground">This month's footprint</div>
+      <div className="flex items-baseline gap-1.5">
+        <div className="text-2xl font-bold">{result.totalKg}</div>
+        <div className="text-xs text-muted-foreground">kg CO₂e</div>
+      </div>
+      <div className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+        ▼ {result.trendPct}% vs last month · {pct}% of UK average
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-secondary">
+        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
+      </div>
+      <ul className="mt-3 space-y-1 text-xs">
+        {top.map((c) => (
+          <li key={c.id} className="flex justify-between">
+            <span>{c.icon} {c.label}</span>
+            <span className="font-medium">{c.kg} kg</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -206,6 +239,8 @@ function MockContent({ id }: { id: WidgetId }) {
       );
     case "lunarPoints":
       return <LunarWidget />;
+    case "co2Tracker":
+      return <CO2Widget />;
   }
 }
 
@@ -214,23 +249,44 @@ export function WidgetCard({
   className,
   onRemove,
   dragHandleProps,
+  themeAccent,
+  themeImage,
+  controls,
 }: {
   id: WidgetId;
   className?: string;
   onRemove?: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
+  /** Small emoji shown when a seasonal/holiday theme is active. */
+  themeAccent?: string;
+  /** Optional faint background image used when seasonal/holiday themes are active. */
+  themeImage?: string;
+  /** Inline controls rendered below the title (e.g. resize buttons in edit mode). */
+  controls?: React.ReactNode;
 }) {
   const meta = WIDGET_CATALOG[id];
   const Icon = ICONS[id];
   return (
     <Card
       className={cn(
-        "group relative flex flex-col gap-3 overflow-hidden border-border/60 p-5 transition-all hover:-translate-y-0.5",
+        "group relative flex h-full flex-col gap-3 overflow-hidden border-border/60 p-5 transition-all hover:-translate-y-0.5",
         className,
       )}
       style={{ background: "var(--gradient-card)", boxShadow: "var(--shadow-card)" }}
     >
-      <div className="flex items-start justify-between gap-2">
+      {themeImage && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage: `url(${themeImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            opacity: 0.12,
+          }}
+        />
+      )}
+      <div className="relative flex items-start justify-between gap-2">
         <div
           {...dragHandleProps}
           className={cn(
@@ -242,6 +298,11 @@ export function WidgetCard({
             <Icon className="h-4 w-4" />
           </span>
           <span>{meta.title}</span>
+          {themeAccent && (
+            <span className="ml-1 text-base leading-none" aria-hidden>
+              {themeAccent}
+            </span>
+          )}
         </div>
         {onRemove && (
           <button
@@ -253,9 +314,25 @@ export function WidgetCard({
           </button>
         )}
       </div>
-      <div className="flex-1">
+      {controls && <div className="relative">{controls}</div>}
+      <div className="relative flex-1">
         <MockContent id={id} />
       </div>
     </Card>
   );
+}
+
+/** Resolve the currently-active theme accent emoji (for seasonal/holiday themes). */
+export function getThemeAccent(themeId: ThemeId, holiday: HolidayOverlayId): { icon?: string; image?: string } {
+  // Active holiday-overlay animation takes priority for the small icon
+  if (holiday !== "none") {
+    const holidayThemeId = OVERLAY_TO_HOLIDAY_THEME[holiday];
+    const meta = findTheme(holidayThemeId);
+    if (meta) return { icon: meta.widgetIcon, image: meta.image };
+  }
+  const meta = findTheme(themeId);
+  if (meta && (meta.kind === "seasonal" || meta.kind === "holiday")) {
+    return { icon: meta.widgetIcon, image: meta.image };
+  }
+  return {};
 }
