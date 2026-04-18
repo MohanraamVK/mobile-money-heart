@@ -11,29 +11,27 @@ export interface UserProfile {
 }
 
 export type WidgetId =
-  | "balance"
-  | "transactions"
-  | "quickTransfer"
-  | "spending"
-  | "savingsGoal"
-  | "cards"
-  | "budget"
-  | "bills"
-  | "currencyConverter"
-  | "investments"
-  | "studentLoans"
-  | "travelWallet"
-  | "jointAccount"
-  | "crypto"
-  | "retirement"
-  | "rewards"
-  | "billSplitter";
+  | "subscriptionManager"
+  | "recurringPayments"
+  | "savingGoals"
+  | "fdRdInvestments"
+  | "expenseSharing"
+  | "cashFlowSplit"
+  | "investmentGuide"
+  | "moneyCalendar"
+  | "passiveIncome"
+  | "financialLimit"
+  | "currencyExchange"
+  | "spendingManager"
+  | "childExpenseTracker"
+  | "insuranceCoverage"
+  | "commonContacts";
 
 export interface WidgetMeta {
   id: WidgetId;
   title: string;
   description: string;
-  category: "core" | "savings" | "lifestyle" | "investing";
+  category: "core" | "savings" | "lifestyle" | "investing" | "family";
   size: "sm" | "md" | "lg";
 }
 
