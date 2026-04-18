@@ -1,21 +1,23 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Footprints, Heart, Moon, Plus, Sparkles, Trophy } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Heart, Leaf, Moon, Plus, Sparkles, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   CHARITIES,
   QUESTS,
-  STEP_CONSTANTS,
-  addSteps,
   claimQuest,
   donateToCharity,
+  ensureMonthlyDonationsReset,
   ensureMonthlyReset,
   questCurrentTier,
+  questsCompletedThisMonth,
   setBadgesDisabled,
   setEquippedBadge,
 } from "@/lib/banking/lunar";
+import { computeCO2 } from "@/lib/banking/co2";
 import { loadState, saveState } from "@/lib/banking/storage";
 import type { BankingState } from "@/lib/banking/types";
 
@@ -23,7 +25,7 @@ export const Route = createFileRoute("/lunar")({
   head: () => ({
     meta: [
       { title: "Star Points — Noctis Bank" },
-      { name: "description", content: "Earn Star Points through healthy spending, walking and donations to good causes." },
+      { name: "description", content: "Earn Star Points through sustainable spending, quests and donations to good causes." },
     ],
   }),
   component: LunarPage,
@@ -34,7 +36,9 @@ function LunarPage() {
 
   useEffect(() => {
     const fresh = loadState();
-    const reset = { ...fresh, lunar: ensureMonthlyReset(fresh.lunar) };
+    let lunar = ensureMonthlyReset(fresh.lunar);
+    lunar = ensureMonthlyDonationsReset(lunar);
+    const reset = { ...fresh, lunar };
     saveState(reset);
     setState(reset);
   }, []);
@@ -42,15 +46,6 @@ function LunarPage() {
   if (!state) return <div className="min-h-screen bg-background" />;
 
   const apply = (next: BankingState) => { saveState(next); setState(next); };
-
-  const logSteps = (n: number) => {
-    const before = state.lunar.points;
-    const next = addSteps(state, n);
-    apply(next);
-    const earned = next.lunar.points - before;
-    if (earned > 0) toast.success(`+${earned} SP for ${n} steps`);
-    else toast(`+${n} steps logged`);
-  };
 
   const claim = (id: string) => {
     const next = claimQuest(state, id);
@@ -92,19 +87,28 @@ function LunarPage() {
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-8 md:px-6">
         <BalanceCard points={state.lunar.points} />
 
-        <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <StepsCard steps={state.lunar.steps} onLog={logSteps} />
-          <BadgesCard
-            owned={state.lunar.ownedBadges}
-            equipped={state.lunar.equippedBadge}
-            disabled={state.lunar.badgesDisabled}
-            onEquip={equip}
-            onToggle={toggleBadges}
-          />
-        </section>
+        <Tabs defaultValue="overview" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-grid">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="impact">My impact this month</TabsTrigger>
+          </TabsList>
 
-        <QuestsSection state={state} onClaim={claim} />
-        <CharitiesSection onDonate={donate} owned={state.lunar.ownedBadges} />
+          <TabsContent value="overview" className="mt-4 space-y-6">
+            <BadgesCard
+              owned={state.lunar.ownedBadges}
+              equipped={state.lunar.equippedBadge}
+              disabled={state.lunar.badgesDisabled}
+              onEquip={equip}
+              onToggle={toggleBadges}
+            />
+            <QuestsSection state={state} onClaim={claim} />
+            <CharitiesSection onDonate={donate} owned={state.lunar.ownedBadges} />
+          </TabsContent>
+
+          <TabsContent value="impact" className="mt-4">
+            <ImpactTab state={state} />
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );
@@ -124,7 +128,7 @@ function BalanceCard({ points }: { points: number }) {
           <div className="text-sm uppercase tracking-wide opacity-80">Your balance</div>
           <div className="text-4xl font-bold">{points.toLocaleString()} SP</div>
           <div className="mt-1 text-sm opacity-90">
-            Earn more with healthy spending, daily steps and giving back.
+            Earn more with sustainable spending, completing quests and giving back.
           </div>
         </div>
       </div>
@@ -132,35 +136,88 @@ function BalanceCard({ points }: { points: number }) {
   );
 }
 
-function StepsCard({ steps, onLog }: { steps: number; onLog: (n: number) => void }) {
-  const into = steps % STEP_CONSTANTS.STEPS_PER_AWARD;
-  const pct = (into / STEP_CONSTANTS.STEPS_PER_AWARD) * 100;
+function ImpactTab({ state }: { state: BankingState }) {
+  const co2 = computeCO2();
+  const co2Pct = Math.min(100, Math.round((co2.totalKg / co2.baselineKg) * 100));
+  const donations = state.lunar.monthlyDonations;
+  const questsDone = questsCompletedThisMonth(state.lunar);
+  const totalQuests = QUESTS.length;
+
   return (
-    <Card className="border-border/60 p-5">
-      <div className="mb-3 flex items-center gap-2">
-        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Footprints className="h-4 w-4" />
-        </span>
-        <div>
-          <div className="text-sm font-semibold">Step counter</div>
-          <div className="text-xs text-muted-foreground">
-            For every {STEP_CONSTANTS.STEPS_PER_AWARD.toLocaleString()} steps, you receive {STEP_CONSTANTS.POINTS_PER_AWARD} Star Points.
-          </div>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <Card className="border-border/60 p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <Leaf className="h-4 w-4" />
+          </span>
+          <div className="text-sm font-semibold">Carbon footprint</div>
         </div>
-      </div>
-      <div className="mb-1 flex items-end justify-between">
-        <div className="text-3xl font-bold">{steps.toLocaleString()}</div>
-        <div className="text-xs text-muted-foreground">{into}/{STEP_CONSTANTS.STEPS_PER_AWARD} to next reward</div>
-      </div>
-      <div className="h-2 rounded-full bg-secondary">
-        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={() => onLog(500)}>+500 steps</Button>
-        <Button size="sm" variant="outline" onClick={() => onLog(1000)}>+1,000 steps</Button>
-        <Button size="sm" variant="outline" onClick={() => onLog(5000)}>+5,000 steps</Button>
-      </div>
-    </Card>
+        <div className="flex items-baseline gap-1.5">
+          <div className="text-3xl font-bold">{co2.totalKg}</div>
+          <div className="text-xs text-muted-foreground">kg CO₂e this month</div>
+        </div>
+        <div className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400">
+          ▼ {co2.trendPct}% vs last month · {co2Pct}% of UK average
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+          <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${co2Pct}%` }} />
+        </div>
+        <ul className="mt-3 space-y-1 text-xs">
+          {co2.byCategory.slice(0, 3).map((c) => (
+            <li key={c.id} className="flex items-center justify-between">
+              <span className="text-muted-foreground">{c.icon} {c.label}</span>
+              <span className="font-medium">{c.kg} kg</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      <Card className="border-border/60 p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-pink-500/10 text-pink-600 dark:text-pink-400">
+            <Heart className="h-4 w-4" />
+          </span>
+          <div className="text-sm font-semibold">Donated to charity</div>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <div className="text-3xl font-bold">{donations.totalAmount.toLocaleString()}</div>
+          <div className="text-xs text-muted-foreground">kr this month</div>
+        </div>
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          {donations.count} {donations.count === 1 ? "donation" : "donations"} made
+        </div>
+        <div className="mt-4 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+          {donations.count === 0
+            ? "Make your first donation this month to unlock a badge and earn Star Points."
+            : `Thanks for giving back! Each donation also unlocks a badge.`}
+        </div>
+      </Card>
+
+      <Card className="border-border/60 p-5">
+        <div className="mb-3 flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <Trophy className="h-4 w-4" />
+          </span>
+          <div className="text-sm font-semibold">Sustainability quests</div>
+        </div>
+        <div className="flex items-baseline gap-1.5">
+          <div className="text-3xl font-bold">{questsDone}</div>
+          <div className="text-xs text-muted-foreground">of {totalQuests} achieved</div>
+        </div>
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          Completed this month
+        </div>
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${(questsDone / Math.max(1, totalQuests)) * 100}%` }}
+          />
+        </div>
+        <div className="mt-3 text-xs text-muted-foreground">
+          Quests reset at the start of each month — claim them in the Overview tab.
+        </div>
+      </Card>
+    </div>
   );
 }
 
