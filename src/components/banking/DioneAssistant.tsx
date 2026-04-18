@@ -84,16 +84,18 @@ const APPOINTMENT_TOPICS = [
 export function DioneAssistant({
   callbacks,
   currentTheme,
+  activeWidgets,
 }: {
   callbacks: DioneCallbacks;
   currentTheme: ThemeId;
+  activeWidgets: WidgetId[];
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "bot",
-      text: "Hi, I'm Dione 🌙 — your Noctis Bank assistant. Type anything (under 100 words) like 'switch to sunset', 'turn on snow', 'how do I earn points' or 'show offers'.",
+      text: "Hi, I'm Dione 🌙 — your Noctis Bank assistant. Type anything (under 100 words) like 'switch to sunset', 'show me my passive income', 'turn on snow' or 'how do I earn points'.",
       quick: ROOT_QUICKS,
     },
   ]);
