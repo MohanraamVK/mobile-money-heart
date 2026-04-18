@@ -12,10 +12,17 @@ interface Props {
 /**
  * Renders the *image backdrop* for the active theme plus an optional animated
  * holiday overlay. Lives behind the dashboard content (z-0, fixed).
+ *
+ * Image opacity is intentionally higher for seasonal/holiday/custom themes so
+ * the picked artwork is clearly visible.
  */
 export function ThemeBackground({ themeId, customThemeImage, holiday, lunar }: Props) {
-  const themeImage =
-    customThemeImage ?? ALL_THEMES.find((t) => t.id === themeId)?.image ?? null;
+  const meta = ALL_THEMES.find((t) => t.id === themeId);
+  const themeImage = customThemeImage ?? meta?.image ?? null;
+  const isFeature = !!customThemeImage || meta?.kind === "seasonal" || meta?.kind === "holiday";
+  const imageOpacity = isFeature ? 0.55 : 0.22;
+  const tintTop = isFeature ? 55 : 80;
+  const tintBottom = isFeature ? 78 : 92;
 
   return (
     <>
@@ -27,8 +34,8 @@ export function ThemeBackground({ themeId, customThemeImage, holiday, lunar }: P
             backgroundImage: `url(${themeImage})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            opacity: 0.18,
-            filter: "saturate(1.1)",
+            opacity: imageOpacity,
+            filter: "saturate(1.15)",
           }}
         />
       )}
@@ -37,8 +44,7 @@ export function ThemeBackground({ themeId, customThemeImage, holiday, lunar }: P
           aria-hidden
           className="pointer-events-none fixed inset-0 z-0"
           style={{
-            background:
-              "linear-gradient(to bottom, color-mix(in oklab, var(--background) 85%, transparent), color-mix(in oklab, var(--background) 95%, transparent))",
+            background: `linear-gradient(to bottom, color-mix(in oklab, var(--background) ${tintTop}%, transparent), color-mix(in oklab, var(--background) ${tintBottom}%, transparent))`,
           }}
         />
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check, Lock, Palette, Sparkles, Trash2, Upload } from "lucide-react";
 import {
   Dialog,
@@ -16,9 +16,12 @@ import { Input } from "@/components/ui/input";
 import {
   DEFAULT_THEMES,
   HOLIDAYS,
+  HOLIDAY_THEMES,
+  HOLIDAY_THEME_TO_OVERLAY,
   SEASONAL_THEMES,
   THEME_COSTS,
   type HolidayOverlayId,
+  type HolidayThemeId,
   type ThemeId,
 } from "@/lib/banking/themes";
 import { activeHoliday, activeSeason } from "@/lib/banking/seasons";
@@ -55,12 +58,12 @@ export function ThemePicker({
     const fresh = loadState();
     const result = spendPoints(fresh, cost, themeId);
     if (!result.ok) {
-      toast.error(`Not enough Lunar Points (need ${cost})`);
+      toast.error(`Not enough Star Points (need ${cost})`);
       return false;
     }
     saveState(result.state);
     onStateChange(result.state);
-    toast.success(`Unlocked theme for ${cost} LP`);
+    toast.success(`Unlocked theme for ${cost} SP`);
     return true;
   };
 
@@ -74,7 +77,18 @@ export function ThemePicker({
     setOpen(false);
   };
 
-  const selectHoliday = (id: HolidayOverlayId) => {
+  const selectHolidayTheme = (id: HolidayThemeId) => {
+    const overlayId = HOLIDAY_THEME_TO_OVERLAY[id];
+    const inWindow = activeH?.id === overlayId;
+    const owned = state.lunar.ownedThemes.includes(id);
+    if (!inWindow && !owned) {
+      if (!tryBuyTheme(id, THEME_COSTS.holidayThemeOutOfWindow)) return;
+    }
+    onChangeTheme(id);
+    setOpen(false);
+  };
+
+  const selectAnimation = (id: HolidayOverlayId) => {
     if (id === "none") {
       onChangeHoliday("none");
       setOpen(false);
@@ -107,14 +121,15 @@ export function ThemePicker({
         <DialogHeader>
           <DialogTitle>Personalise your dashboard</DialogTitle>
           <DialogDescription>
-            Pick a base theme, layer on a holiday animation, or upload your own background.
+            Pick a base theme, layer on a holiday animation, switch to a full holiday or seasonal look, or upload your own background.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="default">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="default">Default</TabsTrigger>
-            <TabsTrigger value="holidays">Holidays</TabsTrigger>
+            <TabsTrigger value="animations">Animations</TabsTrigger>
+            <TabsTrigger value="holiday">Holiday</TabsTrigger>
             <TabsTrigger value="seasonal">Seasonal</TabsTrigger>
             <TabsTrigger value="custom">Custom</TabsTrigger>
           </TabsList>
@@ -136,22 +151,22 @@ export function ThemePicker({
             </div>
           </TabsContent>
 
-          {/* HOLIDAYS */}
-          <TabsContent value="holidays" className="mt-4 space-y-4">
+          {/* ANIMATIONS (formerly Holidays) */}
+          <TabsContent value="animations" className="mt-4 space-y-4">
             <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/40 p-3">
               <div>
                 <Label className="text-sm">Show holiday animations</Label>
-                <p className="text-xs text-muted-foreground">Snow, petals and other overlays.</p>
+                <p className="text-xs text-muted-foreground">Snow, petals and other overlays — layered on your current theme.</p>
               </div>
               <Switch checked={state.lunar.animationsEnabled} onCheckedChange={toggleAnimations} />
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <ThemeTile
-                name="No holiday"
+                name="No animation"
                 description="Just your base theme."
                 swatch="linear-gradient(135deg, #6b7280, #d1d5db)"
                 active={currentHoliday === "none"}
-                onClick={() => selectHoliday("none")}
+                onClick={() => selectAnimation("none")}
               />
               {HOLIDAYS.map((h) => {
                 const inWindow = activeH?.id === h.id;
@@ -167,7 +182,36 @@ export function ThemePicker({
                     badge={inWindow ? "Free now" : undefined}
                     locked={locked}
                     cost={locked ? THEME_COSTS.holidayOutOfWindow : undefined}
-                    onClick={() => selectHoliday(h.id)}
+                    onClick={() => selectAnimation(h.id)}
+                  />
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          {/* HOLIDAY THEMES (full theme + bg image, similar to seasonal) */}
+          <TabsContent value="holiday" className="mt-4">
+            <p className="mb-3 text-xs text-muted-foreground">
+              Full holiday looks with matching colors and background art. Free during the holiday window — afterwards keep them with Star Points.
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {HOLIDAY_THEMES.map((t) => {
+                const overlayId = HOLIDAY_THEME_TO_OVERLAY[t.id as HolidayThemeId];
+                const inWindow = activeH?.id === overlayId;
+                const owned = state.lunar.ownedThemes.includes(t.id);
+                const locked = !inWindow && !owned;
+                return (
+                  <ThemeTile
+                    key={t.id}
+                    name={t.name}
+                    description={t.description}
+                    swatch={t.swatch}
+                    image={t.image}
+                    active={current === t.id}
+                    badge={inWindow ? "Free now" : undefined}
+                    locked={locked}
+                    cost={locked ? THEME_COSTS.holidayThemeOutOfWindow : undefined}
+                    onClick={() => selectHolidayTheme(t.id as HolidayThemeId)}
                   />
                 );
               })}
@@ -254,7 +298,7 @@ function ThemeTile({
             loading="lazy"
             width={1280}
             height={768}
-            className="h-full w-full object-cover opacity-90"
+            className="h-full w-full object-cover"
           />
         )}
         {badge && (
@@ -273,7 +317,7 @@ function ThemeTile({
           <div className="text-sm font-semibold">{name}</div>
           <div className="line-clamp-2 text-xs text-muted-foreground">{description}</div>
           {cost !== undefined && (
-            <div className="mt-1 text-[11px] font-medium text-primary">🌙 {cost} LP to unlock</div>
+            <div className="mt-1 text-[11px] font-medium text-primary">⭐ {cost} SP to unlock</div>
           )}
         </div>
         {active && (
@@ -315,7 +359,7 @@ function CustomThemes({
     if (!dataUrl || !name.trim()) return;
     const result = addCustomTheme(state, name.trim(), dataUrl);
     if (!result.ok) {
-      toast.error(`Custom themes cost ${750} LP — keep earning!`);
+      toast.error(`Custom themes cost ${THEME_COSTS.custom} SP — keep earning!`);
       return;
     }
     saveState(result.state);
@@ -337,10 +381,10 @@ function CustomThemes({
       <div className="rounded-xl border border-dashed border-border/80 bg-muted/30 p-4">
         <div className="mb-2 flex items-center gap-2 text-sm font-medium">
           <Sparkles className="h-4 w-4 text-primary" />
-          Upload your own background ({THEME_COSTS.custom} LP)
+          Upload your own background ({THEME_COSTS.custom} SP)
         </div>
         <p className="mb-3 text-xs text-muted-foreground">
-          You have {state.lunar.points} LP. Custom themes are premium — earn more from quests, donations or steps.
+          You have {state.lunar.points} SP. Custom themes are premium — earn more from quests, donations or steps.
         </p>
         <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
           <Input placeholder="Theme name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -358,7 +402,7 @@ function CustomThemes({
         {dataUrl && (
           <div className="mt-3 flex items-center gap-3">
             <img src={dataUrl} alt="" className="h-16 w-28 rounded-md object-cover" />
-            <Button onClick={submit} disabled={!name.trim()}>Create for 750 LP</Button>
+            <Button onClick={submit} disabled={!name.trim()}>Create for {THEME_COSTS.custom} SP</Button>
           </div>
         )}
       </div>

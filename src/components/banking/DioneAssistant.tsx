@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ALL_THEMES, HOLIDAYS, type ThemeId } from "@/lib/banking/themes";
+import { ALL_THEMES, HOLIDAYS, type HolidayOverlayId, type ThemeId } from "@/lib/banking/themes";
 import { toast } from "sonner";
 
 const WORD_LIMIT = 100;
@@ -10,14 +10,18 @@ const countWords = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
 
 type DioneAction =
   | { type: "theme"; id: ThemeId }
+  | { type: "holiday"; id: HolidayOverlayId }
   | { type: "edit" }
   | { type: "save" }
   | { type: "book"; topic: string }
   | { type: "open"; target: "offers" | "profile" | "lunar" }
-  | { type: "lunarInfo" };
+  | { type: "lunarInfo" }
+  | { type: "co2Info" }
+  | { type: "help" };
 
 export interface DioneCallbacks {
   onSetTheme: (id: ThemeId) => void;
+  onSetHoliday: (id: HolidayOverlayId) => void;
   onToggleEdit: () => void;
   onSaveLayout: () => void;
   onNavigate: (target: "offers" | "profile" | "lunar") => void;
@@ -34,7 +38,8 @@ const ROOT_QUICKS: Msg["quick"] = [
   { label: "✏️ Edit my layout", action: { type: "edit" } },
   { label: "💾 Save current layout", action: { type: "save" } },
   { label: "📅 Book an appointment", action: "back" },
-  { label: "🌙 How do I earn Lunar Points?", action: { type: "lunarInfo" } },
+  { label: "⭐ How do I earn Star Points?", action: { type: "lunarInfo" } },
+  { label: "🌱 My CO₂ footprint", action: { type: "co2Info" } },
   { label: "🎁 See offers", action: { type: "open", target: "offers" } },
   { label: "👤 Open my profile", action: { type: "open", target: "profile" } },
 ];
@@ -58,7 +63,7 @@ export function DioneAssistant({
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "bot",
-      text: "Hi, I'm Dione 🌙 — your Lunar Bank assistant. I can change your theme, tweak your dashboard, book appointments, explain Lunar Points and more. What would you like to do?",
+      text: "Hi, I'm Dione 🌙 — your Noctis Bank assistant. Type anything (under 100 words) like 'switch to sunset', 'turn on snow', 'how do I earn points' or 'show offers'.",
       quick: ROOT_QUICKS,
     },
   ]);
@@ -109,11 +114,21 @@ export function DioneAssistant({
         });
         break;
       }
+      case "holiday": {
+        callbacks.onSetHoliday(action.id);
+        const name = action.id === "none" ? "no holiday" : action.id;
+        push({
+          role: "bot",
+          text: `Holiday animation set to **${name}**. Anything else?`,
+          quick: ROOT_QUICKS,
+        });
+        break;
+      }
       case "edit":
         callbacks.onToggleEdit();
         push({
           role: "bot",
-          text: "Edit mode is on. Drag tiles to reorder, tap × to remove, or use Add widget. Tell me when you're done!",
+          text: "Edit mode is on. Drag tiles to reorder, tap a size button to resize, tap × to remove, or use Add widget.",
           quick: ROOT_QUICKS,
         });
         break;
@@ -147,15 +162,30 @@ export function DioneAssistant({
         push({
           role: "bot",
           text:
-            "**Lunar Points** reward healthier, greener money habits. Here's how to earn them:\n\n" +
-            "• 🚶 **Walk** — every 1,000 steps = 10 LP\n" +
-            "• 🌱 **Quests** — three monthly sustainability quests with progressive tiers (50–450 LP)\n" +
-            "• 💛 **Donate** — to one of four charities and unlock a special badge (+150 LP each)\n\n" +
+            "**Star Points (SP)** reward healthier, greener money habits. Here's how to earn them:\n\n" +
+            "• 🚶 **Walk** — every 1,000 steps = 10 SP\n" +
+            "• 🌱 **Quests** — three monthly sustainability quests with progressive tiers (50–450 SP)\n" +
+            "• 💛 **Donate** — to one of four charities and unlock a special badge (+150 SP each)\n\n" +
             "Spend points to unlock seasonal & holiday themes outside their window, or upload your own custom theme.",
           quick: [
-            { label: "Open Lunar Points", action: { type: "open", target: "lunar" } },
+            { label: "Open Star Points", action: { type: "open", target: "lunar" } },
             { label: "Back", action: "back" },
           ],
+        });
+        break;
+      case "co2Info":
+        push({
+          role: "bot",
+          text:
+            "Your **CO₂ Footprint** widget estimates emissions from each spend category (food, transport, shopping, energy, travel) using kg-CO₂e-per-£ factors. Lower spend in high-factor categories = lower footprint.",
+          quick: ROOT_QUICKS,
+        });
+        break;
+      case "help":
+        push({
+          role: "bot",
+          text: "I can: switch theme, toggle holiday animations, edit/save your layout, book appointments, explain Star Points & CO₂, open offers or profile. Just say what you'd like!",
+          quick: ROOT_QUICKS,
         });
         break;
     }
@@ -167,46 +197,68 @@ export function DioneAssistant({
     setInput("");
     push({ role: "user", text });
 
-    const lc = text.toLowerCase();
-    const themeHit = ALL_THEMES.find((t) => lc.includes(t.id) || lc.includes(t.name.toLowerCase()));
-    if (themeHit && (lc.includes("theme") || lc.includes("color"))) {
-      handleAction(themeHit.name, { type: "theme", id: themeHit.id });
+    const action = parseIntent(text);
+    if (action) {
+      // Route through handleAction for unified bot response (skip echoing the user msg).
+      runAction(action);
       return;
     }
-    const holidayHit = HOLIDAYS.find((h) => lc.includes(h.id));
-    if (holidayHit && (lc.includes("holiday") || lc.includes("snow") || lc.includes("flower"))) {
-      handleAction("Change theme", "back");
-      return;
-    }
-    if (lc.includes("lunar") || lc.includes("point") || lc.includes("step") || lc.includes("quest") || lc.includes("donat")) {
-      handleAction("How do I earn Lunar Points?", { type: "lunarInfo" });
-      return;
-    }
-    if (lc.includes("edit") || lc.includes("rearrang") || lc.includes("move")) {
-      handleAction("Edit my layout", { type: "edit" });
-      return;
-    }
-    if (lc.includes("save")) {
-      handleAction("Save current layout", { type: "save" });
-      return;
-    }
-    if (lc.includes("appointment") || lc.includes("book") || lc.includes("meeting")) {
-      handleAction("📅 Book an appointment", "back");
-      return;
-    }
-    if (lc.includes("offer") || lc.includes("promo") || lc.includes("deal")) {
-      handleAction("See offers", { type: "open", target: "offers" });
-      return;
-    }
-    if (lc.includes("profile") || lc.includes("account info")) {
-      handleAction("Open my profile", { type: "open", target: "profile" });
-      return;
-    }
+
     push({
       role: "bot",
-      text: "I can help with themes, layout edits, saving layouts, booking appointments, Lunar Points, offers and your profile. Pick one below 👇",
+      text: "I'm not sure I caught that — here are things I can do:",
       quick: ROOT_QUICKS,
     });
+  };
+
+  /** Run an action without re-pushing the user message (already pushed by handleFreeText). */
+  const runAction = (action: DioneAction) => {
+    switch (action.type) {
+      case "theme": {
+        callbacks.onSetTheme(action.id);
+        const name = ALL_THEMES.find((t) => t.id === action.id)?.name ?? action.id;
+        push({ role: "bot", text: `Switched to the **${name}** theme ✨`, quick: ROOT_QUICKS });
+        break;
+      }
+      case "holiday": {
+        callbacks.onSetHoliday(action.id);
+        push({
+          role: "bot",
+          text: action.id === "none"
+            ? "Turned holiday animations off."
+            : `Turned on **${action.id}** animations 🎉`,
+          quick: ROOT_QUICKS,
+        });
+        break;
+      }
+      case "edit":
+        callbacks.onToggleEdit();
+        push({ role: "bot", text: "Edit mode is on — drag, resize, add or remove widgets.", quick: ROOT_QUICKS });
+        break;
+      case "save":
+        callbacks.onSaveLayout();
+        push({ role: "bot", text: "Opening the save dialog — name your layout!", quick: ROOT_QUICKS });
+        break;
+      case "open":
+        callbacks.onNavigate(action.target);
+        push({ role: "bot", text: `Opening **${action.target}** for you.`, quick: ROOT_QUICKS });
+        break;
+      case "book": {
+        const slot = nextSlot();
+        toast.success(`Booked: ${action.topic} on ${slot}`);
+        push({ role: "bot", text: `Booked **${action.topic}** for **${slot}** ✅`, quick: ROOT_QUICKS });
+        break;
+      }
+      case "lunarInfo":
+        handleAction("How do I earn Star Points?", { type: "lunarInfo" });
+        break;
+      case "co2Info":
+        handleAction("My CO₂ footprint", { type: "co2Info" });
+        break;
+      case "help":
+        handleAction("Help", { type: "help" });
+        break;
+    }
   };
 
   return (
@@ -234,7 +286,7 @@ export function DioneAssistant({
             </div>
             <div className="flex-1">
               <div className="text-sm font-semibold">Dione</div>
-              <div className="text-xs opacity-80">Your Lunar Bank assistant</div>
+              <div className="text-xs opacity-80">Your Noctis Bank assistant</div>
             </div>
           </header>
 
@@ -302,6 +354,103 @@ export function DioneAssistant({
     </>
   );
 }
+
+/**
+ * Lightweight intent parser. Scores phrases against the input and returns the
+ * best match. Order matters: the *first* high-scoring rule wins.
+ */
+function parseIntent(text: string): DioneAction | null {
+  const lc = text.toLowerCase();
+
+  // 1) HOLIDAY ANIMATION TOGGLES — explicit wins
+  if (/(turn|switch|enable|start|put on|add).*(snow|christmas)/.test(lc) || /^snow$/.test(lc)) {
+    return { type: "holiday", id: "christmas" };
+  }
+  if (/(turn|switch|enable|start|put on|add).*(easter|egg)/.test(lc)) {
+    return { type: "holiday", id: "easter" };
+  }
+  if (/(turn|switch|enable|start|put on|add).*(midsummer|flower|petal)/.test(lc)) {
+    return { type: "holiday", id: "midsummer" };
+  }
+  if (/(turn off|disable|stop|remove|hide).*(snow|holiday|animation|flower|petal|egg)/.test(lc)) {
+    return { type: "holiday", id: "none" };
+  }
+  if (/(no|none) (holiday|animation)/.test(lc)) {
+    return { type: "holiday", id: "none" };
+  }
+
+  // 2) THEME — match by name
+  const themeHit = ALL_THEMES.find((t) => {
+    const name = t.name.toLowerCase();
+    const id = t.id.toLowerCase();
+    return new RegExp(`\\b${name}\\b`).test(lc) || new RegExp(`\\b${id}\\b`).test(lc);
+  });
+  if (themeHit) {
+    if (/(theme|color|colour|background|look|style|switch|change|use|apply|set)/.test(lc)) {
+      return { type: "theme", id: themeHit.id };
+    }
+  }
+  // bare "change theme" with no specific theme → fallback to help-style theme list
+  if (/(change|switch|set|pick|choose|new) (the )?(theme|color|colour|look|background|style)/.test(lc)) {
+    return { type: "help" };
+  }
+
+  // 3) STAR POINTS / lunar
+  if (/(star|lunar) ?points?|^points?\b|how.*(earn|get).*(point|sp|lp)|reward|sp balance/.test(lc)) {
+    if (/(open|see|show|view|go to)/.test(lc)) return { type: "open", target: "lunar" };
+    return { type: "lunarInfo" };
+  }
+  if (/\b(quest|step|donat|charit)/.test(lc)) {
+    return { type: "lunarInfo" };
+  }
+
+  // 4) CO2
+  if (/co2|co₂|carbon|footprint|emission|green|sustainab/.test(lc)) {
+    return { type: "co2Info" };
+  }
+
+  // 5) LAYOUT / EDIT
+  if (/(edit|customi[sz]e|rearrang|reorder|move|drag|resize)/.test(lc) && /(layout|widget|dashboard|home)/.test(lc)) {
+    return { type: "edit" };
+  }
+  if (/^(edit|customi[sz]e|rearrange)\b/.test(lc)) return { type: "edit" };
+  if (/(save|store|keep).*(layout|dashboard)/.test(lc) || lc === "save") {
+    return { type: "save" };
+  }
+
+  // 6) APPOINTMENTS
+  if (/(book|schedul|appointment|meeting|advisor|talk to|speak)/.test(lc)) {
+    if (/mortgage/.test(lc)) return { type: "book", topic: "Mortgage advisor" };
+    if (/invest/.test(lc)) return { type: "book", topic: "Investment review" };
+    if (/account/.test(lc)) return { type: "book", topic: "Open new account" };
+    if (/card|fraud|stolen|lost/.test(lc)) return { type: "book", topic: "Card / fraud help" };
+    return { type: "book", topic: "Mortgage advisor" };
+  }
+
+  // 7) NAVIGATION
+  if (/(offer|promo|deal|discount|cashback)/.test(lc)) return { type: "open", target: "offers" };
+  if (/(profile|account info|my (info|details)|address|name|nationality|date of birth)/.test(lc)) {
+    return { type: "open", target: "profile" };
+  }
+
+  // 8) HELP fallback
+  if (/^(help|what can you do|hi|hello|hey)\b/.test(lc) || /what.*do/.test(lc)) {
+    return { type: "help" };
+  }
+
+  // Last-ditch: if a holiday word alone, assume animation toggle on
+  if (/^(christmas|easter|midsummer)$/.test(lc)) {
+    return { type: "holiday", id: lc as HolidayOverlayId };
+  }
+
+  // Last-ditch: bare theme name
+  if (themeHit) return { type: "theme", id: themeHit.id };
+
+  return null;
+}
+
+// keeping HOLIDAYS import linkage even though parser uses regex
+void HOLIDAYS;
 
 function nextSlot() {
   const d = new Date();
