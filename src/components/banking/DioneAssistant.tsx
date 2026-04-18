@@ -3,6 +3,8 @@ import { Bot, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_THEMES, HOLIDAYS, type HolidayOverlayId, type ThemeId } from "@/lib/banking/themes";
+import { WIDGET_CATALOG } from "@/lib/banking/widgets";
+import type { WidgetId } from "@/lib/banking/types";
 import { toast } from "sonner";
 
 const WORD_LIMIT = 100;
@@ -17,6 +19,7 @@ type DioneAction =
   | { type: "open"; target: "offers" | "profile" | "lunar" }
   | { type: "lunarInfo" }
   | { type: "co2Info" }
+  | { type: "findWidget"; id: WidgetId }
   | { type: "help" };
 
 export interface DioneCallbacks {
@@ -25,7 +28,34 @@ export interface DioneCallbacks {
   onToggleEdit: () => void;
   onSaveLayout: () => void;
   onNavigate: (target: "offers" | "profile" | "lunar") => void;
+  onFindWidget: (id: WidgetId, present: boolean) => void;
 }
+
+/**
+ * Per-widget keyword aliases used by the intent parser. Matching is case-insensitive
+ * substring against the user input. Keep entries lowercase. The widget title is
+ * always implicitly searched too.
+ */
+const WIDGET_ALIASES: Record<WidgetId, string[]> = {
+  subscriptionManager: ["subscription", "subscriptions", "netflix", "spotify", "recurring service"],
+  recurringPayments: ["recurring payment", "rent", "bill", "bills", "utilities"],
+  savingGoals: ["saving", "savings", "saving goal", "goal", "goals", "target"],
+  fdRdInvestments: ["fd", "rd", "fixed deposit", "recurring deposit", "deposit"],
+  expenseSharing: ["splitwise", "split", "share expense", "shared expense", "owe", "roommate"],
+  cashFlowSplit: ["cash flow", "cashflow", "budget split", "needs wants", "50/30/20"],
+  investmentGuide: ["investment guide", "invest tips", "investing guide", "stock tips"],
+  moneyCalendar: ["calendar", "schedule", "due date", "pay day", "payday"],
+  passiveIncome: ["passive", "passive income", "dividend", "rent income", "side hustle"],
+  financialLimit: ["financial limit", "spending limit", "limit", "cap"],
+  currencyExchange: ["currency", "exchange", "fx", "forex", "conversion"],
+  spendingManager: ["spending", "spend manager", "expenses", "expense", "categorize"],
+  childExpenseTracker: ["child", "kid", "kids", "children", "school"],
+  insuranceCoverage: ["insurance", "policy", "coverage", "premium"],
+  commonContacts: ["contact", "contacts", "payee", "payees", "send money"],
+  lunarPoints: ["star points", "star point", "lunar points", "sp balance", "rewards", "points widget"],
+  co2Tracker: ["co2", "co₂", "carbon", "footprint", "emission", "emissions"],
+};
+
 
 type Msg = {
   role: "bot" | "user";
