@@ -294,6 +294,19 @@ export function DioneAssistant({
         push({ role: "bot", text: `Booked **${action.topic}** for **${slot}** ✅`, quick: ROOT_QUICKS });
         break;
       }
+      case "findWidget": {
+        const meta = WIDGET_CATALOG[action.id];
+        const present = activeWidgets.includes(action.id);
+        callbacks.onFindWidget(action.id, present);
+        push({
+          role: "bot",
+          text: present
+            ? `Found **${meta.title}** — scrolling there now ✨`
+            : `**${meta.title}** isn't on your dashboard yet. I'll open the editor so you can add it.`,
+          quick: ROOT_QUICKS,
+        });
+        break;
+      }
       case "lunarInfo":
         handleAction("How do I earn Star Points?", { type: "lunarInfo" });
         break;
