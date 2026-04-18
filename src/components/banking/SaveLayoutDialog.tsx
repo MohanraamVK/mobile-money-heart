@@ -13,8 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function SaveLayoutDialog({ onSave }: { onSave: (name: string) => void }) {
-  const [open, setOpen] = useState(false);
+export function SaveLayoutDialog({
+  onSave,
+  open: controlledOpen,
+  onOpenChange,
+}: {
+  onSave: (name: string) => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    onOpenChange?.(v);
+    setInternalOpen(v);
+  };
   const [name, setName] = useState("");
 
   const submit = () => {
