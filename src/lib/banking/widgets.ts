@@ -108,9 +108,16 @@ export const WIDGET_CATALOG: Record<WidgetId, WidgetMeta> = {
   },
   lunarPoints: {
     id: "lunarPoints",
-    title: "Lunar Points",
+    title: "Star Points",
     description: "Your rewards balance, monthly quests and step counter at a glance.",
     category: "rewards",
+    size: "md",
+  },
+  co2Tracker: {
+    id: "co2Tracker",
+    title: "CO₂ Footprint",
+    description: "Estimated CO₂ emissions from your purchases this month.",
+    category: "sustainability",
     size: "md",
   },
 };
@@ -123,6 +130,7 @@ export const DEFAULT_WIDGETS: WidgetId[] = [
   "savingGoals",
   "moneyCalendar",
   "lunarPoints",
+  "co2Tracker",
 ];
 
 export interface OnboardingAnswers {
@@ -182,6 +190,7 @@ export function recommendWidgets(profile: UserProfile, a: OnboardingAnswers): Wi
 
   set.add("moneyCalendar");
   set.add("lunarPoints");
+  set.add("co2Tracker");
 
   return Array.from(set);
 }

@@ -26,20 +26,25 @@ export type WidgetId =
   | "childExpenseTracker"
   | "insuranceCoverage"
   | "commonContacts"
-  | "lunarPoints";
+  | "lunarPoints"
+  | "co2Tracker";
 
 export interface WidgetMeta {
   id: WidgetId;
   title: string;
   description: string;
-  category: "core" | "savings" | "lifestyle" | "investing" | "family" | "rewards";
+  category: "core" | "savings" | "lifestyle" | "investing" | "family" | "rewards" | "sustainability";
   size: "sm" | "md" | "lg";
 }
+
+/** Per-widget visual override the user can pick in edit mode. */
+export type WidgetShape = "square" | "wide" | "tall" | "xl";
 
 export interface SavedLayout {
   id: string;
   name: string;
   widgets: WidgetId[];
+  shapes?: Partial<Record<WidgetId, WidgetShape>>;
   createdAt: number;
 }
 
@@ -81,6 +86,8 @@ export interface LunarState {
 export interface BankingState {
   profile: UserProfile;
   activeWidgets: WidgetId[];
+  /** Per-widget visual size overrides for the *active* layout. */
+  widgetShapes: Partial<Record<WidgetId, WidgetShape>>;
   layouts: SavedLayout[];
   onboarded: boolean;
   lunar: LunarState;
