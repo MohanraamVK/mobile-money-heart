@@ -20,8 +20,7 @@ type Step = {
 const STEPS: Step[] = [
   {
     id: "persona",
-    question: (p) =>
-      `Thanks ${p.fullName.split(" ")[0]}! Which best describes you right now? (We pre-selected one based on your age of ${p.age}.)`,
+    question: () => "Which best describes you right now?",
     choices: [
       { label: "Youth (18–25)", value: "youth" },
       { label: "Working adult (25+)", value: "workingAdult" },
