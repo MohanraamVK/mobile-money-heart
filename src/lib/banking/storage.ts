@@ -1,5 +1,5 @@
 import type { BankingState, SavedLayout, UserProfile, WidgetId } from "./types";
-import { DEFAULT_WIDGETS } from "./widgets";
+import { DEFAULT_WIDGETS, WIDGET_CATALOG } from "./widgets";
 
 const KEY = "banking-state-v1";
 
@@ -22,13 +22,24 @@ const initialState: BankingState = {
   onboarded: false,
 };
 
+const isValidWidget = (id: string): id is WidgetId => id in WIDGET_CATALOG;
+const cleanWidgets = (ids: WidgetId[] | undefined): WidgetId[] =>
+  (ids ?? []).filter(isValidWidget);
+
 export function loadState(): BankingState {
   if (typeof window === "undefined") return initialState;
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return initialState;
     const parsed = JSON.parse(raw) as Partial<BankingState>;
-    return { ...initialState, ...parsed };
+    const merged: BankingState = { ...initialState, ...parsed };
+    merged.activeWidgets = cleanWidgets(merged.activeWidgets);
+    if (merged.activeWidgets.length === 0) merged.activeWidgets = DEFAULT_WIDGETS;
+    merged.layouts = (merged.layouts ?? []).map((l) => ({
+      ...l,
+      widgets: cleanWidgets(l.widgets),
+    }));
+    return merged;
   } catch {
     return initialState;
   }
