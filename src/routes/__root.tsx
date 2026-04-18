@@ -65,5 +65,9 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  if (typeof window !== "undefined") {
+    const stored = window.localStorage.getItem("banking-theme-v1");
+    if (stored) document.documentElement.setAttribute("data-theme", stored);
+  }
   return <Outlet />;
 }
