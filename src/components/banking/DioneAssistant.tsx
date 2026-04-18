@@ -2,21 +2,25 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { THEMES, type ThemeId } from "@/lib/banking/themes";
+import { ALL_THEMES, HOLIDAYS, type ThemeId } from "@/lib/banking/themes";
 import { toast } from "sonner";
+
+const WORD_LIMIT = 100;
+const countWords = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
 
 type DioneAction =
   | { type: "theme"; id: ThemeId }
   | { type: "edit" }
   | { type: "save" }
   | { type: "book"; topic: string }
-  | { type: "open"; target: "offers" | "profile" };
+  | { type: "open"; target: "offers" | "profile" | "lunar" }
+  | { type: "lunarInfo" };
 
 export interface DioneCallbacks {
   onSetTheme: (id: ThemeId) => void;
   onToggleEdit: () => void;
   onSaveLayout: () => void;
-  onNavigate: (target: "offers" | "profile") => void;
+  onNavigate: (target: "offers" | "profile" | "lunar") => void;
 }
 
 type Msg = {
@@ -30,6 +34,7 @@ const ROOT_QUICKS: Msg["quick"] = [
   { label: "✏️ Edit my layout", action: { type: "edit" } },
   { label: "💾 Save current layout", action: { type: "save" } },
   { label: "📅 Book an appointment", action: "back" },
+  { label: "🌙 How do I earn Lunar Points?", action: { type: "lunarInfo" } },
   { label: "🎁 See offers", action: { type: "open", target: "offers" } },
   { label: "👤 Open my profile", action: { type: "open", target: "profile" } },
 ];
@@ -53,11 +58,13 @@ export function DioneAssistant({
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "bot",
-      text: "Hi, I'm Dione 🌙 — your Lunar Bank assistant. I can change your theme, tweak your dashboard, book appointments, and more. What would you like to do?",
+      text: "Hi, I'm Dione 🌙 — your Lunar Bank assistant. I can change your theme, tweak your dashboard, book appointments, explain Lunar Points and more. What would you like to do?",
       quick: ROOT_QUICKS,
     },
   ]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wordCount = countWords(input);
+  const overLimit = wordCount > WORD_LIMIT;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -69,12 +76,11 @@ export function DioneAssistant({
     push({ role: "user", text: label });
 
     if (action === "back") {
-      // Sub-menus
       if (label.includes("theme")) {
         push({
           role: "bot",
           text: "Pick a theme and I'll apply it instantly:",
-          quick: THEMES.map((t) => ({
+          quick: ALL_THEMES.map((t) => ({
             label: `${t.id === currentTheme ? "✓ " : ""}${t.name}`,
             action: { type: "theme", id: t.id },
           })),
@@ -95,7 +101,7 @@ export function DioneAssistant({
     switch (action.type) {
       case "theme": {
         callbacks.onSetTheme(action.id);
-        const name = THEMES.find((t) => t.id === action.id)?.name ?? action.id;
+        const name = ALL_THEMES.find((t) => t.id === action.id)?.name ?? action.id;
         push({
           role: "bot",
           text: `Done — switched to the **${name}** theme. Want anything else?`,
@@ -137,20 +143,43 @@ export function DioneAssistant({
           quick: ROOT_QUICKS,
         });
         break;
+      case "lunarInfo":
+        push({
+          role: "bot",
+          text:
+            "**Lunar Points** reward healthier, greener money habits. Here's how to earn them:\n\n" +
+            "• 🚶 **Walk** — every 1,000 steps = 10 LP\n" +
+            "• 🌱 **Quests** — three monthly sustainability quests with progressive tiers (50–450 LP)\n" +
+            "• 💛 **Donate** — to one of four charities and unlock a special badge (+150 LP each)\n\n" +
+            "Spend points to unlock seasonal & holiday themes outside their window, or upload your own custom theme.",
+          quick: [
+            { label: "Open Lunar Points", action: { type: "open", target: "lunar" } },
+            { label: "Back", action: "back" },
+          ],
+        });
+        break;
     }
   };
 
   const handleFreeText = () => {
     const text = input.trim();
-    if (!text) return;
+    if (!text || overLimit) return;
     setInput("");
     push({ role: "user", text });
 
     const lc = text.toLowerCase();
-    // Tiny scripted intent matcher
-    const themeHit = THEMES.find((t) => lc.includes(t.id) || lc.includes(t.name.toLowerCase()));
+    const themeHit = ALL_THEMES.find((t) => lc.includes(t.id) || lc.includes(t.name.toLowerCase()));
     if (themeHit && (lc.includes("theme") || lc.includes("color"))) {
       handleAction(themeHit.name, { type: "theme", id: themeHit.id });
+      return;
+    }
+    const holidayHit = HOLIDAYS.find((h) => lc.includes(h.id));
+    if (holidayHit && (lc.includes("holiday") || lc.includes("snow") || lc.includes("flower"))) {
+      handleAction("Change theme", "back");
+      return;
+    }
+    if (lc.includes("lunar") || lc.includes("point") || lc.includes("step") || lc.includes("quest") || lc.includes("donat")) {
+      handleAction("How do I earn Lunar Points?", { type: "lunarInfo" });
       return;
     }
     if (lc.includes("edit") || lc.includes("rearrang") || lc.includes("move")) {
@@ -175,14 +204,13 @@ export function DioneAssistant({
     }
     push({
       role: "bot",
-      text: "I can help with themes, layout edits, saving layouts, booking appointments, offers and your profile. Pick one below 👇",
+      text: "I can help with themes, layout edits, saving layouts, booking appointments, Lunar Points, offers and your profile. Pick one below 👇",
       quick: ROOT_QUICKS,
     });
   };
 
   return (
     <>
-      {/* Floating launcher */}
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
@@ -221,7 +249,7 @@ export function DioneAssistant({
                   )}
                   <div
                     className={cn(
-                      "max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
+                      "max-w-[85%] whitespace-pre-line rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
                       m.role === "user"
                         ? "rounded-br-sm bg-primary text-primary-foreground"
                         : "rounded-bl-sm bg-secondary text-secondary-foreground",
@@ -253,11 +281,20 @@ export function DioneAssistant({
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleFreeText()}
                 placeholder="Ask Dione anything…"
-                className="flex-1 rounded-full border border-border bg-background px-4 py-2 text-sm outline-none focus:border-primary"
+                className={cn(
+                  "flex-1 rounded-full border bg-background px-4 py-2 text-sm outline-none focus:border-primary",
+                  overLimit ? "border-destructive" : "border-border",
+                )}
               />
-              <Button size="icon" onClick={handleFreeText} aria-label="Send">
+              <Button size="icon" onClick={handleFreeText} disabled={overLimit || !input.trim()} aria-label="Send">
                 <Send className="h-4 w-4" />
               </Button>
+            </div>
+            <div className={cn(
+              "mt-1.5 text-right text-[11px]",
+              overLimit ? "text-destructive font-medium" : "text-muted-foreground",
+            )}>
+              {wordCount}/{WORD_LIMIT} words {overLimit && "· too long"}
             </div>
           </footer>
         </div>

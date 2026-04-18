@@ -14,12 +14,15 @@ import {
   Baby,
   ShieldCheck,
   Contact,
+  Moon,
   type LucideIcon,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { WidgetId } from "@/lib/banking/types";
 import { WIDGET_CATALOG } from "@/lib/banking/widgets";
+import { loadState } from "@/lib/banking/storage";
+import { useEffect, useState } from "react";
 
 const ICONS: Record<WidgetId, LucideIcon> = {
   subscriptionManager: Repeat,
@@ -37,7 +40,31 @@ const ICONS: Record<WidgetId, LucideIcon> = {
   childExpenseTracker: Baby,
   insuranceCoverage: ShieldCheck,
   commonContacts: Contact,
+  lunarPoints: Moon,
 };
+
+function LunarWidget() {
+  const [points, setPoints] = useState(0);
+  const [steps, setSteps] = useState(0);
+  useEffect(() => {
+    const tick = () => {
+      const s = loadState();
+      setPoints(s.lunar.points);
+      setSteps(s.lunar.steps);
+    };
+    tick();
+    const i = setInterval(tick, 2000);
+    return () => clearInterval(i);
+  }, []);
+  return (
+    <div>
+      <div className="mb-1 text-sm text-muted-foreground">Your balance</div>
+      <div className="text-2xl font-bold">🌙 {points.toLocaleString()} LP</div>
+      <div className="mt-2 text-xs text-muted-foreground">{steps.toLocaleString()} steps tracked</div>
+      <div className="mt-3 text-xs text-primary">Tap to earn more →</div>
+    </div>
+  );
+}
 
 function MockContent({ id }: { id: WidgetId }) {
   switch (id) {
@@ -86,17 +113,9 @@ function MockContent({ id }: { id: WidgetId }) {
     case "cashFlowSplit":
       return (
         <div className="space-y-2">
-          {[
-            ["Needs", 50],
-            ["Wants", 30],
-            ["Savings", 15],
-            ["Investments", 5],
-          ].map(([n, v]) => (
+          {[["Needs", 50], ["Wants", 30], ["Savings", 15], ["Investments", 5]].map(([n, v]) => (
             <div key={n as string}>
-              <div className="mb-1 flex justify-between text-xs">
-                <span>{n}</span>
-                <span className="text-muted-foreground">{v}%</span>
-              </div>
+              <div className="mb-1 flex justify-between text-xs"><span>{n}</span><span className="text-muted-foreground">{v}%</span></div>
               <div className="h-1.5 rounded-full bg-secondary">
                 <div className="h-full rounded-full bg-primary" style={{ width: `${v}%` }} />
               </div>
@@ -151,16 +170,9 @@ function MockContent({ id }: { id: WidgetId }) {
     case "spendingManager":
       return (
         <div className="space-y-2">
-          {[
-            ["Food", 65],
-            ["Transit", 32],
-            ["Bills", 80],
-          ].map(([n, v]) => (
+          {[["Food", 65], ["Transit", 32], ["Bills", 80]].map(([n, v]) => (
             <div key={n as string}>
-              <div className="mb-1 flex justify-between text-xs">
-                <span>{n}</span>
-                <span className="text-muted-foreground">£{(v as number) * 4}</span>
-              </div>
+              <div className="mb-1 flex justify-between text-xs"><span>{n}</span><span className="text-muted-foreground">£{(v as number) * 4}</span></div>
               <div className="h-1.5 rounded-full bg-secondary">
                 <div className="h-full rounded-full bg-primary" style={{ width: `${v}%` }} />
               </div>
@@ -188,15 +200,12 @@ function MockContent({ id }: { id: WidgetId }) {
       return (
         <div className="flex gap-2">
           {["JM", "AS", "RT", "+"].map((i) => (
-            <div
-              key={i}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-medium"
-            >
-              {i}
-            </div>
+            <div key={i} className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-medium">{i}</div>
           ))}
         </div>
       );
+    case "lunarPoints":
+      return <LunarWidget />;
   }
 }
 

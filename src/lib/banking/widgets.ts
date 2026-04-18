@@ -106,6 +106,13 @@ export const WIDGET_CATALOG: Record<WidgetId, WidgetMeta> = {
     category: "core",
     size: "sm",
   },
+  lunarPoints: {
+    id: "lunarPoints",
+    title: "Lunar Points",
+    description: "Your rewards balance, monthly quests and step counter at a glance.",
+    category: "rewards",
+    size: "md",
+  },
 };
 
 // Sensible default if user skips customization
@@ -115,7 +122,7 @@ export const DEFAULT_WIDGETS: WidgetId[] = [
   "cashFlowSplit",
   "savingGoals",
   "moneyCalendar",
-  "commonContacts",
+  "lunarPoints",
 ];
 
 export interface OnboardingAnswers {
@@ -125,57 +132,36 @@ export interface OnboardingAnswers {
   interestedInPassive: "yes" | "no";
 }
 
-// Persona presets derived from the product brief
 const PERSONA_WIDGETS: Record<OnboardingAnswers["persona"], WidgetId[]> = {
   workingAdult: [
-    "subscriptionManager",
-    "recurringPayments",
-    "savingGoals",
-    "fdRdInvestments",
-    "expenseSharing",
-    "cashFlowSplit",
-    "investmentGuide",
-    "moneyCalendar",
-    "passiveIncome",
+    "subscriptionManager", "recurringPayments", "savingGoals", "fdRdInvestments",
+    "expenseSharing", "cashFlowSplit", "investmentGuide", "moneyCalendar", "passiveIncome",
   ],
   youth: [
-    "subscriptionManager",
-    "recurringPayments",
-    "expenseSharing",
-    "cashFlowSplit",
-    "moneyCalendar",
-    "passiveIncome",
+    "subscriptionManager", "recurringPayments", "expenseSharing",
+    "cashFlowSplit", "moneyCalendar", "passiveIncome",
   ],
   intlStudent: [
-    "subscriptionManager",
-    "recurringPayments",
-    "expenseSharing",
-    "financialLimit",
-    "currencyExchange",
-    "cashFlowSplit",
-    "moneyCalendar",
+    "subscriptionManager", "recurringPayments", "expenseSharing", "financialLimit",
+    "currencyExchange", "cashFlowSplit", "moneyCalendar",
   ],
   family: [
-    "spendingManager",
-    "savingGoals",
-    "childExpenseTracker",
-    "insuranceCoverage",
-    "passiveIncome",
-    "recurringPayments",
-    "moneyCalendar",
+    "spendingManager", "savingGoals", "childExpenseTracker", "insuranceCoverage",
+    "passiveIncome", "recurringPayments", "moneyCalendar",
   ],
   elderly: [
-    "commonContacts",
-    "recurringPayments",
-    "moneyCalendar",
-    "insuranceCoverage",
-    "spendingManager",
+    "commonContacts", "recurringPayments", "moneyCalendar", "insuranceCoverage", "spendingManager",
   ],
 };
 
 export function inferPersona(profile: UserProfile): OnboardingAnswers["persona"] {
   if (profile.age >= 65) return "elderly";
-  if (profile.nationality && profile.residence && !profile.residence.toLowerCase().includes(profile.nationality.toLowerCase()) && profile.age < 30) {
+  if (
+    profile.nationality &&
+    profile.residence &&
+    !profile.residence.toLowerCase().includes(profile.nationality.toLowerCase()) &&
+    profile.age < 30
+  ) {
     return "intlStudent";
   }
   if (profile.age < 25) return "youth";
@@ -186,34 +172,16 @@ export function inferPersona(profile: UserProfile): OnboardingAnswers["persona"]
 export function recommendWidgets(profile: UserProfile, a: OnboardingAnswers): WidgetId[] {
   const set = new Set<WidgetId>(PERSONA_WIDGETS[a.persona]);
 
-  if (a.primaryGoal === "save") {
-    set.add("savingGoals");
-    set.add("financialLimit");
-    set.add("cashFlowSplit");
-  }
-  if (a.primaryGoal === "spend") {
-    set.add("spendingManager");
-    set.add("subscriptionManager");
-  }
-  if (a.primaryGoal === "invest") {
-    set.add("investmentGuide");
-    set.add("fdRdInvestments");
-    set.add("passiveIncome");
-  }
-  if (a.primaryGoal === "share") {
-    set.add("expenseSharing");
-    set.add("commonContacts");
-  }
+  if (a.primaryGoal === "save") { set.add("savingGoals"); set.add("financialLimit"); set.add("cashFlowSplit"); }
+  if (a.primaryGoal === "spend") { set.add("spendingManager"); set.add("subscriptionManager"); }
+  if (a.primaryGoal === "invest") { set.add("investmentGuide"); set.add("fdRdInvestments"); set.add("passiveIncome"); }
+  if (a.primaryGoal === "share") { set.add("expenseSharing"); set.add("commonContacts"); }
 
-  if (a.travelOften === "yes") {
-    set.add("currencyExchange");
-  }
-  if (a.interestedInPassive === "yes") {
-    set.add("passiveIncome");
-  }
+  if (a.travelOften === "yes") set.add("currencyExchange");
+  if (a.interestedInPassive === "yes") set.add("passiveIncome");
 
-  // Always-useful staples
   set.add("moneyCalendar");
+  set.add("lunarPoints");
 
   return Array.from(set);
 }

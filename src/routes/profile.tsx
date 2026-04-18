@@ -1,6 +1,6 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, QrCode, Save, Trash2, Upload, Pencil } from "lucide-react";
+import { ArrowLeft, QrCode, Save, ScanLine, Trash2, Pencil } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -32,6 +31,8 @@ import {
 } from "@/lib/banking/storage";
 import type { BankingState, SavedLayout, UserProfile } from "@/lib/banking/types";
 import { WIDGET_CATALOG } from "@/lib/banking/widgets";
+import { CHARITIES } from "@/lib/banking/lunar";
+import { QrScannerDialog } from "@/components/banking/QrScannerDialog";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -44,13 +45,11 @@ export const Route = createFileRoute("/profile")({
 });
 
 function ProfilePage() {
-  const navigate = useNavigate();
   const [state, setState] = useState<BankingState | null>(null);
   const [draft, setDraft] = useState<UserProfile | null>(null);
   const [editing, setEditing] = useState(false);
   const [shareLayout, setShareLayout] = useState<SavedLayout | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
-  const [importCode, setImportCode] = useState("");
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   useEffect(() => {
     const s = loadState();
@@ -73,18 +72,20 @@ function ProfilePage() {
     toast.success("Layout deleted");
   };
 
-  const handleImport = () => {
-    const decoded = decodeLayout(importCode);
+  const handleScanResult = (text: string) => {
+    const decoded = decodeLayout(text);
     if (!decoded) {
       toast.error("That code doesn't look right");
       return;
     }
     importLayout(decoded.name, decoded.widgets);
     setState(loadState());
-    setImportOpen(false);
-    setImportCode("");
     toast.success(`Imported "${decoded.name}"`);
   };
+
+  const equippedBadge = state.lunar.badgesDisabled
+    ? null
+    : CHARITIES.find((c) => c.id === state.lunar.equippedBadge);
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,14 +105,27 @@ function ProfilePage() {
           <div className="mb-5 flex items-start justify-between gap-4">
             <div className="flex items-center gap-4">
               <div
-                className="flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold text-primary-foreground"
+                className="relative flex h-16 w-16 items-center justify-center rounded-full text-2xl font-bold text-primary-foreground"
                 style={{ background: "var(--gradient-primary)" }}
               >
                 {draft.fullName.charAt(0)}
+                {equippedBadge && (
+                  <span
+                    className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-card text-base shadow ring-2 ring-card"
+                    title={equippedBadge.badgeLabel}
+                  >
+                    {equippedBadge.badgeEmoji}
+                  </span>
+                )}
               </div>
               <div>
                 <h1 className="text-xl font-semibold">{draft.fullName}</h1>
                 <p className="text-sm text-muted-foreground">{draft.email}</p>
+                {equippedBadge && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Wearing: <span className="font-medium" style={{ color: equippedBadge.color }}>{equippedBadge.badgeLabel}</span>
+                  </p>
+                )}
               </div>
             </div>
             {editing ? (
@@ -169,11 +183,11 @@ function ProfilePage() {
             <div>
               <h2 className="text-lg font-semibold">Saved dashboard layouts</h2>
               <p className="text-sm text-muted-foreground">
-                Share with friends via QR or import a layout someone shared with you.
+                Share with friends via QR or scan someone else's QR to import their layout.
               </p>
             </div>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportOpen(true)}>
-              <Upload className="h-4 w-4" /> Import layout
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setScannerOpen(true)}>
+              <ScanLine className="h-4 w-4" /> Scan QR to import
             </Button>
           </div>
 
@@ -233,35 +247,14 @@ function ProfilePage() {
           <DialogHeader>
             <DialogTitle>Share "{shareLayout?.name}"</DialogTitle>
             <DialogDescription>
-              Scan this QR with another Lunar Bank app, or copy the code below.
+              Have the other person open Profile → Scan QR and point their camera at this code.
             </DialogDescription>
           </DialogHeader>
           {shareLayout && <ShareView layout={shareLayout} />}
         </DialogContent>
       </Dialog>
 
-      {/* Import dialog */}
-      <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import a layout</DialogTitle>
-            <DialogDescription>
-              Paste a layout code shared with you. (In the full app you'd scan the QR with your camera.)
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            value={importCode}
-            onChange={(e) => setImportCode(e.target.value)}
-            placeholder="Paste layout code here…"
-            rows={5}
-            className="font-mono text-xs"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setImportOpen(false)}>Cancel</Button>
-            <Button onClick={handleImport} disabled={!importCode.trim()}>Import</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <QrScannerDialog open={scannerOpen} onOpenChange={setScannerOpen} onScan={handleScanResult} />
     </div>
   );
 }

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as OffersRouteImport } from './routes/offers'
+import { Route as LunarRouteImport } from './routes/lunar'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ProfileRoute = ProfileRouteImport.update({
@@ -23,6 +24,11 @@ const OffersRoute = OffersRouteImport.update({
   path: '/offers',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LunarRoute = LunarRouteImport.update({
+  id: '/lunar',
+  path: '/lunar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -31,30 +37,34 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/lunar': typeof LunarRoute
   '/offers': typeof OffersRoute
   '/profile': typeof ProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/lunar': typeof LunarRoute
   '/offers': typeof OffersRoute
   '/profile': typeof ProfileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/lunar': typeof LunarRoute
   '/offers': typeof OffersRoute
   '/profile': typeof ProfileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/offers' | '/profile'
+  fullPaths: '/' | '/lunar' | '/offers' | '/profile'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/offers' | '/profile'
-  id: '__root__' | '/' | '/offers' | '/profile'
+  to: '/' | '/lunar' | '/offers' | '/profile'
+  id: '__root__' | '/' | '/lunar' | '/offers' | '/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LunarRoute: typeof LunarRoute
   OffersRoute: typeof OffersRoute
   ProfileRoute: typeof ProfileRoute
 }
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OffersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/lunar': {
+      id: '/lunar'
+      path: '/lunar'
+      fullPath: '/lunar'
+      preLoaderRoute: typeof LunarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -87,6 +104,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LunarRoute: LunarRoute,
   OffersRoute: OffersRoute,
   ProfileRoute: ProfileRoute,
 }
