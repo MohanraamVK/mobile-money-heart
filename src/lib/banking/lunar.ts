@@ -1,15 +1,10 @@
 import type { BankingState, CharityId, LunarState, QuestProgress, BadgeId } from "./types";
 import { currentMonthKey } from "./seasons";
 
-const STEPS_PER_AWARD = 1000;
-const POINTS_PER_AWARD = 10;
-
 export const INITIAL_LUNAR: LunarState = {
   points: 0,
-  steps: 0,
-  lastStepClaimedAt: 0,
-  stepsClaimed: 0,
   quests: {},
+  monthlyDonations: { monthKey: currentMonthKey(), totalAmount: 0, count: 0 },
   ownedThemes: [],
   ownedBadges: [],
   equippedBadge: null,
