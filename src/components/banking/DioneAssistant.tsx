@@ -246,6 +246,11 @@ export function DioneAssistant({
     if (action) {
       // Route through handleAction for unified bot response (skip echoing the user msg).
       runAction(action);
+      // Auto-close the chatbot for "find/show/where is my..." style prompts so
+      // the user can see the widget they were looking for.
+      if (action.type === "findWidget" || /\b(show|find|where|where'?s|locate|jump to|scroll to|take me to|go to)\b.*\bmy\b/i.test(text)) {
+        setTimeout(() => setOpen(false), 250);
+      }
       return;
     }
 
