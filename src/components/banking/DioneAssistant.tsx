@@ -518,6 +518,25 @@ function parseIntent(text: string): DioneAction | null {
 // keeping HOLIDAYS import linkage even though parser uses regex
 void HOLIDAYS;
 
+/**
+ * Find the best widget id for a free-text query. Scores by longest matching
+ * alias/title (longer matches win to avoid "income" hijacking "passive income").
+ */
+function matchWidget(lc: string): WidgetId | null {
+  let best: { id: WidgetId; len: number } | null = null;
+  (Object.keys(WIDGET_CATALOG) as WidgetId[]).forEach((id) => {
+    const meta = WIDGET_CATALOG[id];
+    const candidates = [meta.title.toLowerCase(), ...(WIDGET_ALIASES[id] ?? [])];
+    for (const c of candidates) {
+      if (c.length < 3) continue;
+      if (lc.includes(c) && (!best || c.length > best.len)) {
+        best = { id, len: c.length };
+      }
+    }
+  });
+  return best ? best.id : null;
+}
+
 function nextSlot() {
   const d = new Date();
   d.setDate(d.getDate() + 2);
