@@ -15,22 +15,35 @@ import type { WidgetId } from "@/lib/banking/types";
 export function AddWidgetDialog({
   active,
   onAdd,
+  open: openProp,
+  onOpenChange,
+  hideTrigger,
 }: {
   active: WidgetId[];
   onAdd: (id: WidgetId) => void;
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  hideTrigger?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+  const setOpen = (v: boolean) => {
+    onOpenChange?.(v);
+    if (openProp === undefined) setInternalOpen(v);
+  };
   const available = (Object.keys(WIDGET_CATALOG) as WidgetId[]).filter(
     (id) => !active.includes(id),
   );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
-          <Plus className="h-4 w-4" /> Add widget
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-1.5">
+            <Plus className="h-4 w-4" /> Add widget
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Add a widget</DialogTitle>

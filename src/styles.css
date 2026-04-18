@@ -362,3 +362,13 @@
   50%  { transform: translate3d(-40px, 50vh, 0) rotate(-180deg); }
   100% { transform: translate3d(30px, 105vh, 0) rotate(-360deg); }
 }
+
+/* ===== Dione widget highlight pulse ===== */
+@keyframes dione-widget-pulse {
+  0%   { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.55), 0 0 0 0 hsl(var(--primary) / 0.35); }
+  60%  { box-shadow: 0 0 0 10px hsl(var(--primary) / 0), 0 0 28px 4px hsl(var(--primary) / 0.45); }
+  100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0), 0 0 0 0 hsl(var(--primary) / 0); }
+}
+.dione-pulse {
+  animation: dione-widget-pulse 1.4s ease-out 2;
+}

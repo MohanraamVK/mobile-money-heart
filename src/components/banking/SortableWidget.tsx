@@ -58,7 +58,13 @@ export function SortableWidget({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={cn(SHAPE_CLASS[effectiveShape])}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      id={`widget-${id}`}
+      data-widget-id={id}
+      className={cn(SHAPE_CLASS[effectiveShape], "scroll-mt-24 rounded-2xl transition-shadow")}
+    >
       <WidgetCard
         id={id}
         onRemove={editing ? onRemove : undefined}

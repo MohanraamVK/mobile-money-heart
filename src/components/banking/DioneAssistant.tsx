@@ -3,6 +3,8 @@ import { Bot, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ALL_THEMES, HOLIDAYS, type HolidayOverlayId, type ThemeId } from "@/lib/banking/themes";
+import { WIDGET_CATALOG } from "@/lib/banking/widgets";
+import type { WidgetId } from "@/lib/banking/types";
 import { toast } from "sonner";
 
 const WORD_LIMIT = 100;
@@ -17,6 +19,7 @@ type DioneAction =
   | { type: "open"; target: "offers" | "profile" | "lunar" }
   | { type: "lunarInfo" }
   | { type: "co2Info" }
+  | { type: "findWidget"; id: WidgetId }
   | { type: "help" };
 
 export interface DioneCallbacks {
@@ -25,7 +28,34 @@ export interface DioneCallbacks {
   onToggleEdit: () => void;
   onSaveLayout: () => void;
   onNavigate: (target: "offers" | "profile" | "lunar") => void;
+  onFindWidget: (id: WidgetId, present: boolean) => void;
 }
+
+/**
+ * Per-widget keyword aliases used by the intent parser. Matching is case-insensitive
+ * substring against the user input. Keep entries lowercase. The widget title is
+ * always implicitly searched too.
+ */
+const WIDGET_ALIASES: Record<WidgetId, string[]> = {
+  subscriptionManager: ["subscription", "subscriptions", "netflix", "spotify", "recurring service"],
+  recurringPayments: ["recurring payment", "rent", "bill", "bills", "utilities"],
+  savingGoals: ["saving", "savings", "saving goal", "goal", "goals", "target"],
+  fdRdInvestments: ["fd", "rd", "fixed deposit", "recurring deposit", "deposit"],
+  expenseSharing: ["splitwise", "split", "share expense", "shared expense", "owe", "roommate"],
+  cashFlowSplit: ["cash flow", "cashflow", "budget split", "needs wants", "50/30/20"],
+  investmentGuide: ["investment guide", "invest tips", "investing guide", "stock tips"],
+  moneyCalendar: ["calendar", "schedule", "due date", "pay day", "payday"],
+  passiveIncome: ["passive", "passive income", "dividend", "rent income", "side hustle"],
+  financialLimit: ["financial limit", "spending limit", "limit", "cap"],
+  currencyExchange: ["currency", "exchange", "fx", "forex", "conversion"],
+  spendingManager: ["spending", "spend manager", "expenses", "expense", "categorize"],
+  childExpenseTracker: ["child", "kid", "kids", "children", "school"],
+  insuranceCoverage: ["insurance", "policy", "coverage", "premium"],
+  commonContacts: ["contact", "contacts", "payee", "payees", "send money"],
+  lunarPoints: ["star points", "star point", "lunar points", "sp balance", "rewards", "points widget"],
+  co2Tracker: ["co2", "co₂", "carbon", "footprint", "emission", "emissions"],
+};
+
 
 type Msg = {
   role: "bot" | "user";
@@ -54,16 +84,18 @@ const APPOINTMENT_TOPICS = [
 export function DioneAssistant({
   callbacks,
   currentTheme,
+  activeWidgets,
 }: {
   callbacks: DioneCallbacks;
   currentTheme: ThemeId;
+  activeWidgets: WidgetId[];
 }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "bot",
-      text: "Hi, I'm Dione 🌙 — your Noctis Bank assistant. Type anything (under 100 words) like 'switch to sunset', 'turn on snow', 'how do I earn points' or 'show offers'.",
+      text: "Hi, I'm Dione 🌙 — your Noctis Bank assistant. Type anything (under 100 words) like 'switch to sunset', 'show me my passive income', 'turn on snow' or 'how do I earn points'.",
       quick: ROOT_QUICKS,
     },
   ]);
@@ -181,10 +213,23 @@ export function DioneAssistant({
           quick: ROOT_QUICKS,
         });
         break;
+      case "findWidget": {
+        const meta = WIDGET_CATALOG[action.id];
+        const present = activeWidgets.includes(action.id);
+        callbacks.onFindWidget(action.id, present);
+        push({
+          role: "bot",
+          text: present
+            ? `Scrolling to your **${meta.title}** widget — I've highlighted it for you.`
+            : `You don't have **${meta.title}** on your dashboard yet. Opening the editor so you can add it.`,
+          quick: ROOT_QUICKS,
+        });
+        break;
+      }
       case "help":
         push({
           role: "bot",
-          text: "I can: switch theme, toggle holiday animations, edit/save your layout, book appointments, explain Star Points & CO₂, open offers or profile. Just say what you'd like!",
+          text: "I can: switch theme, toggle holiday animations, edit/save your layout, find any widget on your dashboard, book appointments, explain Star Points & CO₂, open offers or profile. Just say what you'd like!",
           quick: ROOT_QUICKS,
         });
         break;
@@ -247,6 +292,19 @@ export function DioneAssistant({
         const slot = nextSlot();
         toast.success(`Booked: ${action.topic} on ${slot}`);
         push({ role: "bot", text: `Booked **${action.topic}** for **${slot}** ✅`, quick: ROOT_QUICKS });
+        break;
+      }
+      case "findWidget": {
+        const meta = WIDGET_CATALOG[action.id];
+        const present = activeWidgets.includes(action.id);
+        callbacks.onFindWidget(action.id, present);
+        push({
+          role: "bot",
+          text: present
+            ? `Found **${meta.title}** — scrolling there now ✨`
+            : `**${meta.title}** isn't on your dashboard yet. I'll open the editor so you can add it.`,
+          quick: ROOT_QUICKS,
+        });
         break;
       }
       case "lunarInfo":
@@ -395,6 +453,14 @@ function parseIntent(text: string): DioneAction | null {
     return { type: "help" };
   }
 
+  // 2.5) FIND WIDGET — strong-intent verbs short-circuit topic catch-alls below.
+  const findVerb = /(find|show|where|locate|take me to|jump to|scroll to|open my|see my|view my|go to my|i want to see|i wanna see|navigate to)/.test(lc);
+  const widgetWord = /\b(widget|tile|card|tracker|panel|section)\b/.test(lc);
+  const widgetMatch = matchWidget(lc);
+  if (widgetMatch && (findVerb || widgetWord)) {
+    return { type: "findWidget", id: widgetMatch };
+  }
+
   // 3) STAR POINTS / lunar
   if (/(star|lunar) ?points?|^points?\b|how.*(earn|get).*(point|sp|lp)|reward|sp balance/.test(lc)) {
     if (/(open|see|show|view|go to)/.test(lc)) return { type: "open", target: "lunar" };
@@ -451,6 +517,27 @@ function parseIntent(text: string): DioneAction | null {
 
 // keeping HOLIDAYS import linkage even though parser uses regex
 void HOLIDAYS;
+
+/**
+ * Find the best widget id for a free-text query. Scores by longest matching
+ * alias/title (longer matches win to avoid "income" hijacking "passive income").
+ */
+function matchWidget(lc: string): WidgetId | null {
+  let bestId: WidgetId | null = null;
+  let bestLen = 0;
+  (Object.keys(WIDGET_CATALOG) as WidgetId[]).forEach((id) => {
+    const meta = WIDGET_CATALOG[id];
+    const candidates = [meta.title.toLowerCase(), ...(WIDGET_ALIASES[id] ?? [])];
+    for (const c of candidates) {
+      if (c.length < 3) continue;
+      if (lc.includes(c) && c.length > bestLen) {
+        bestId = id;
+        bestLen = c.length;
+      }
+    }
+  });
+  return bestId;
+}
 
 function nextSlot() {
   const d = new Date();
