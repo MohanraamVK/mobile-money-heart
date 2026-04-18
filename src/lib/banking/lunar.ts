@@ -144,22 +144,15 @@ export function questCurrentTier(progress: QuestProgress | undefined, def: Quest
   return { tier: def.tiers[idx], index: idx };
 }
 
-export function addSteps(state: BankingState, delta: number): BankingState {
-  const lunar = ensureMonthlyReset(state.lunar);
-  const newSteps = lunar.steps + delta;
-  const totalAwards = Math.floor(newSteps / STEPS_PER_AWARD);
-  const claimedAwards = Math.floor(lunar.stepsClaimed / STEPS_PER_AWARD);
-  const newAwards = Math.max(0, totalAwards - claimedAwards);
-  return {
-    ...state,
-    lunar: {
-      ...lunar,
-      steps: newSteps,
-      stepsClaimed: totalAwards * STEPS_PER_AWARD,
-      points: lunar.points + newAwards * POINTS_PER_AWARD,
-      lastStepClaimedAt: newAwards > 0 ? Date.now() : lunar.lastStepClaimedAt,
-    },
-  };
+export function ensureMonthlyDonationsReset(lunar: LunarState): LunarState {
+  const month = currentMonthKey();
+  if (lunar.monthlyDonations.monthKey === month) return lunar;
+  return { ...lunar, monthlyDonations: { monthKey: month, totalAmount: 0, count: 0 } };
+}
+
+export function questsCompletedThisMonth(lunar: LunarState): number {
+  const month = currentMonthKey();
+  return Object.values(lunar.quests).filter((q) => q.monthKey === month && q.claimedThisCycle).length;
 }
 
 export function claimQuest(state: BankingState, questId: string): BankingState {
