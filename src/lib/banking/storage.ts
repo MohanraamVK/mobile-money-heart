@@ -1,5 +1,6 @@
-import type { BankingState, SavedLayout, UserProfile, WidgetId } from "./types";
+import type { BankingState, LunarState, SavedLayout, UserProfile, WidgetId } from "./types";
 import { DEFAULT_WIDGETS, WIDGET_CATALOG } from "./widgets";
+import { INITIAL_LUNAR } from "./lunar";
 
 const KEY = "banking-state-v1";
 
@@ -20,11 +21,16 @@ const initialState: BankingState = {
   activeWidgets: DEFAULT_WIDGETS,
   layouts: [],
   onboarded: false,
+  lunar: INITIAL_LUNAR,
 };
 
 const isValidWidget = (id: string): id is WidgetId => id in WIDGET_CATALOG;
 const cleanWidgets = (ids: WidgetId[] | undefined): WidgetId[] =>
   (ids ?? []).filter(isValidWidget);
+
+function mergeLunar(partial: Partial<LunarState> | undefined): LunarState {
+  return { ...INITIAL_LUNAR, ...(partial ?? {}) };
+}
 
 export function loadState(): BankingState {
   if (typeof window === "undefined") return initialState;
@@ -32,7 +38,7 @@ export function loadState(): BankingState {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return initialState;
     const parsed = JSON.parse(raw) as Partial<BankingState>;
-    const merged: BankingState = { ...initialState, ...parsed };
+    const merged: BankingState = { ...initialState, ...parsed, lunar: mergeLunar(parsed.lunar) };
     merged.activeWidgets = cleanWidgets(merged.activeWidgets);
     if (merged.activeWidgets.length === 0) merged.activeWidgets = DEFAULT_WIDGETS;
     merged.layouts = (merged.layouts ?? []).map((l) => ({
@@ -114,6 +120,13 @@ export function decodeLayout(code: string): { name: string; widgets: WidgetId[] 
   } catch {
     return null;
   }
+}
+
+/** Replace just the lunar slice (used by lunar.ts pure helpers). */
+export function persistLunar(lunar: LunarState) {
+  const s = loadState();
+  s.lunar = lunar;
+  saveState(s);
 }
 
 export function resetAll() {
