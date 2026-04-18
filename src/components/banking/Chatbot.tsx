@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { UserProfile, WidgetId } from "@/lib/banking/types";
 import {
   DEFAULT_WIDGETS,
+  inferPersona,
   type OnboardingAnswers,
   recommendWidgets,
 } from "@/lib/banking/widgets";
@@ -18,38 +19,41 @@ type Step = {
 
 const STEPS: Step[] = [
   {
+    id: "persona",
+    question: (p) =>
+      `Thanks ${p.fullName.split(" ")[0]}! Which best describes you right now? (We pre-selected one based on your age of ${p.age}.)`,
+    choices: [
+      { label: "Youth (18–25)", value: "youth" },
+      { label: "Working adult (25+)", value: "workingAdult" },
+      { label: "International student", value: "intlStudent" },
+      { label: "Family / shared finances", value: "family" },
+    ],
+  },
+  {
     id: "primaryGoal",
-    question: (p) => `Thanks ${p.fullName.split(" ")[0]}! What matters most to you right now?`,
+    question: () => "What matters most to you right now?",
     choices: [
       { label: "Saving more", value: "save" },
-      { label: "Day-to-day spending", value: "spend" },
-      { label: "Investing for the future", value: "invest" },
-      { label: "Travel & lifestyle", value: "travel" },
+      { label: "Tracking spending", value: "spend" },
+      { label: "Growing investments", value: "invest" },
+      { label: "Sharing expenses", value: "share" },
     ],
   },
   {
     id: "travelOften",
     question: (p) =>
-      `You're based in ${p.residence}. Do you travel abroad often?`,
+      `You're based in ${p.residence}. Do you deal with multiple currencies often?`,
     choices: [
       { label: "Yes, frequently", value: "yes" },
       { label: "Not really", value: "no" },
     ],
   },
   {
-    id: "hasDependents",
-    question: () => "Do you share finances with a partner or family?",
+    id: "interestedInPassive",
+    question: () => "Last one — would you like to track passive income (dividends, rent, crypto)?",
     choices: [
-      { label: "Yes", value: "yes" },
-      { label: "No, just me", value: "no" },
-    ],
-  },
-  {
-    id: "interestedInCrypto",
-    question: () => "Last one — interested in tracking crypto holdings?",
-    choices: [
-      { label: "Yes, show crypto", value: "yes" },
-      { label: "Skip crypto", value: "no" },
+      { label: "Yes, show it", value: "yes" },
+      { label: "Skip for now", value: "no" },
     ],
   },
 ];
