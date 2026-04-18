@@ -213,10 +213,23 @@ export function DioneAssistant({
           quick: ROOT_QUICKS,
         });
         break;
+      case "findWidget": {
+        const meta = WIDGET_CATALOG[action.id];
+        const present = activeWidgets.includes(action.id);
+        callbacks.onFindWidget(action.id, present);
+        push({
+          role: "bot",
+          text: present
+            ? `Scrolling to your **${meta.title}** widget — I've highlighted it for you.`
+            : `You don't have **${meta.title}** on your dashboard yet. Opening the editor so you can add it.`,
+          quick: ROOT_QUICKS,
+        });
+        break;
+      }
       case "help":
         push({
           role: "bot",
-          text: "I can: switch theme, toggle holiday animations, edit/save your layout, book appointments, explain Star Points & CO₂, open offers or profile. Just say what you'd like!",
+          text: "I can: switch theme, toggle holiday animations, edit/save your layout, find any widget on your dashboard, book appointments, explain Star Points & CO₂, open offers or profile. Just say what you'd like!",
           quick: ROOT_QUICKS,
         });
         break;
