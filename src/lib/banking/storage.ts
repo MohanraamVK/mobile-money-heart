@@ -89,6 +89,33 @@ export function applyLayout(id: string) {
   saveState(s);
 }
 
+export function updateProfile(patch: Partial<UserProfile>) {
+  const s = loadState();
+  s.profile = { ...s.profile, ...patch };
+  saveState(s);
+  return s.profile;
+}
+
+export function importLayout(name: string, widgets: WidgetId[]): SavedLayout {
+  return saveLayout(name, cleanWidgets(widgets));
+}
+
+export function encodeLayout(layout: SavedLayout): string {
+  const payload = { v: 1, n: layout.name, w: layout.widgets };
+  return btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+}
+
+export function decodeLayout(code: string): { name: string; widgets: WidgetId[] } | null {
+  try {
+    const json = decodeURIComponent(escape(atob(code.trim())));
+    const parsed = JSON.parse(json) as { v: number; n: string; w: WidgetId[] };
+    if (!parsed || parsed.v !== 1 || !Array.isArray(parsed.w)) return null;
+    return { name: parsed.n || "Imported layout", widgets: cleanWidgets(parsed.w) };
+  } catch {
+    return null;
+  }
+}
+
 export function resetAll() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(KEY);
